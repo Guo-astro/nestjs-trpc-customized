@@ -52,6 +52,11 @@ export class TRPCModule implements OnModuleInit {
     const imports: Array<DynamicModule> = [];
 
     if (options.autoSchemaFile != null) {
+      // Set the environment variable for StaticGenerator to use
+      process.env.TRPC_SCHEMA_FILE_PATH = options.autoSchemaFile;
+      console.log(`[TRPC Debug] Set TRPC_SCHEMA_FILE_PATH to: ${options.autoSchemaFile}`);
+      console.log(`[TRPC Debug] Resolved schema output path: ${options.autoSchemaFile}`);
+      
       const fileScanner = new FileScanner();
       const callerFilePath = fileScanner.getCallerFilePath();
       imports.push(
@@ -67,7 +72,12 @@ export class TRPCModule implements OnModuleInit {
     return {
       module: TRPCModule,
       imports,
-      providers: [{ provide: TRPC_MODULE_OPTIONS, useValue: options }],
+      providers: [
+        { provide: TRPC_MODULE_OPTIONS, useValue: options },
+        // Add StaticGenerator provider at the module level
+        StaticGenerator
+      ],
+      global: true, // Make the module global to ensure StaticGenerator is available everywhere
     };
   }
 

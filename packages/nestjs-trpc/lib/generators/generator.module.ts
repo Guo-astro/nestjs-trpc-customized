@@ -80,7 +80,9 @@ export class GeneratorModule implements OnModuleInit {
           useValue: appRouterSourceFile,
         },
         { provide: TRPC_GENERATOR_OPTIONS, useValue: options },
+        StaticGenerator,
       ],
+      exports: [TRPCGenerator, StaticGenerator],
     };
   }
 
