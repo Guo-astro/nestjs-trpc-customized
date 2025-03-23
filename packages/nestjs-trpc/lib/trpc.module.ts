@@ -12,6 +12,7 @@ import { FileScanner } from './scanners/file.scanner';
 import { GeneratorModule } from './generators/generator.module';
 import { FactoryModule } from './factories/factory.module';
 import { ScannerModule } from './scanners/scanner.module';
+import { StaticGenerator } from './generators/static.generator';
 
 @Module({
   imports: [FactoryModule, ScannerModule],
@@ -26,6 +27,8 @@ import { ScannerModule } from './scanners/scanner.module';
 
     // Exports
     AppRouterHost,
+    // Add StaticGenerator directly to make sure it gets initialized
+    StaticGenerator,
   ],
   exports: [AppRouterHost],
 })

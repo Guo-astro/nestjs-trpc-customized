@@ -5,49 +5,56 @@ import {
   Type,
   VariableDeclarationKind,
 } from 'ts-morph';
-import { ConsoleLogger, Inject, Injectable } from '@nestjs/common';
+import { ConsoleLogger, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { SourceFileImportsMap } from '../interfaces/generator.interface';
 import * as path from 'node:path';
 import * as fs from 'fs/promises';
 
 @Injectable()
-export class StaticGenerator {
+export class StaticGenerator implements OnModuleInit {
   @Inject(ConsoleLogger)
   private readonly consoleLogger!: ConsoleLogger;
 
+  async onModuleInit() {
+    this.consoleLogger.log('StaticGenerator initializing', 'StaticGenerator');
+    try {
+      await this.generate();
+    } catch (error) {
+      this.consoleLogger.error(`StaticGenerator initialization error: ${error}`, 'StaticGenerator');
+      if (error instanceof Error) {
+        this.consoleLogger.error(`Stack trace: ${error.stack}`, 'StaticGenerator');
+      }
+    }
+  }
+
   public async generate(): Promise<void> {
     try {
-      this.consoleLogger.log(
-        'Beginning static file generation...',
-        'Static Generator',
-      );
+      this.consoleLogger.log('Beginning static file generation...', 'StaticGenerator');
+      // Log environment variables to help debug
+      this.consoleLogger.log(`TRPC_SCHEMA_FILE_PATH: ${process.env.TRPC_SCHEMA_FILE_PATH || 'undefined'}`, 'StaticGenerator');
+      this.consoleLogger.log(`Current working directory: ${process.cwd()}`, 'StaticGenerator');
+      
       await this.generateServerFile();
-      this.consoleLogger.log(
-        'Static file generation completed successfully',
-        'Static Generator',
-      );
+      this.consoleLogger.log('Static file generation completed successfully', 'StaticGenerator');
     } catch (error) {
-      this.consoleLogger.error(
-        `Error during static file generation: ${error}`,
-        'Static Generator',
-      );
+      this.consoleLogger.error(`Error during static file generation: ${error}`, 'StaticGenerator');
       if (error instanceof Error) {
-        this.consoleLogger.error(
-          `Stack trace: ${error.stack}`,
-          'Static Generator',
-        );
+        this.consoleLogger.error(`Stack trace: ${error.stack}`, 'StaticGenerator');
       }
-      throw error;
     }
   }
 
   public async generateServerFile(): Promise<void> {
     try {
+      this.consoleLogger.log('Starting generateServerFile method', 'StaticGenerator');
       const options = this.getTRPCOptions();
+      
+      this.consoleLogger.log(`TRPC options: ${JSON.stringify(options)}`, 'StaticGenerator');
+      
       if (!options || !options.autoSchemaFile) {
         this.consoleLogger.warn(
           'No autoSchemaFile option provided, skipping server.ts generation',
-          'Static Generator',
+          'StaticGenerator',
         );
         return;
       }
@@ -92,21 +99,30 @@ export class StaticGenerator {
           'Static Generator',
         );
       }
-      throw error;
     }
   }
 
   private getTRPCOptions() {
-    // This would need to be implemented to access the TRPCModuleOptions
-    // You'd need to inject the options from wherever they're stored
-    this.consoleLogger.log('Getting TRPC module options', 'Static Generator');
+    this.consoleLogger.log('Getting TRPC module options', 'StaticGenerator');
     try {
-      // Implementation would depend on how options are stored in your app
-      return { autoSchemaFile: process.env.TRPC_SCHEMA_FILE_PATH };
+      // Log all environment variables to debug
+      this.consoleLogger.log(`All env vars: ${JSON.stringify(process.env)}`, 'StaticGenerator');
+      
+      // Try to get options from multiple possible sources
+      const schemaPath = process.env.TRPC_SCHEMA_FILE_PATH || 
+                         process.env.TRPC_AUTO_SCHEMA_PATH || 
+                         './src/trpc/generated';
+      
+      this.consoleLogger.log(`Using schema path: ${schemaPath}`, 'StaticGenerator');
+      
+      return { 
+        autoSchemaFile: schemaPath,
+        schemaFileImports: [] // Add default empty array
+      };
     } catch (error) {
       this.consoleLogger.error(
         `Failed to get TRPC options: ${error}`,
-        'Static Generator',
+        'StaticGenerator',
       );
       return null;
     }
