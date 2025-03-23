@@ -76,7 +76,21 @@ export class TRPCGenerator implements OnModuleInit {
   ): Promise<void> {
     try {
       this.consoleLogger.log(
-        'Starting AppRouter schema generation...',
+        '[TRPC Debug] Starting AppRouter schema generation...',
+        'TRPC Generator'
+      );
+      
+      // Add file path debugging
+      this.consoleLogger.log(
+        `[TRPC Debug] AppRouter file path: ${this.appRouterSourceFile.getFilePath()}`,
+        'TRPC Generator'
+      );
+      this.consoleLogger.log(
+        `[TRPC Debug] File exists: ${require('fs').existsSync(this.appRouterSourceFile.getFilePath())}`,
+        'TRPC Generator'
+      );
+      this.consoleLogger.log(
+        `[TRPC Debug] Directory exists: ${require('fs').existsSync(path.dirname(this.appRouterSourceFile.getFilePath()))}`,
         'TRPC Generator'
       );
       
