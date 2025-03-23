@@ -9,36 +9,62 @@ import { SourceMapping } from '../interfaces/scanner.interface';
  */
 @Injectable()
 export class FileScanner {
-  public getCallerFilePath(skip: number = 2): string {
-    const originalPrepareStackTrace = Error.prepareStackTrace;
-
-    Error.prepareStackTrace = (_, stack) => stack;
-    const error = new Error();
-    const stack = error.stack as unknown as NodeJS.CallSite[];
-
-    Error.prepareStackTrace = originalPrepareStackTrace;
-
-    const caller = stack[skip];
-    const jsFilePath = caller?.getFileName();
-
-    if (jsFilePath == null) {
-      throw new Error(`Could not find caller file: ${caller}`);
-    }
-
+  public getCallerFilePath(): string {
     try {
-      // Attempt to find the source map file and extract the original TypeScript path
-      const sourceMap = this.getSourceMapFromJSPath(jsFilePath);
-      return this.normalizePath(
-        path.resolve(jsFilePath, '..', sourceMap.sources[0]),
-      );
-    } catch (error) {
-      // Suppress the warning if in test environment
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn(
-          `Warning: Could not resolve source map for ${jsFilePath}. Falling back to default path resolution.`,
+      console.log('[TRPC Debug] Getting caller file path');
+
+      // First try to get from environment variable (useful in containers)
+      if (process.env.TRPC_MODULE_CALLER_FILE_PATH) {
+        console.log(
+          `[TRPC Debug] Using TRPC_MODULE_CALLER_FILE_PATH env var: ${process.env.TRPC_MODULE_CALLER_FILE_PATH}`,
         );
+        return process.env.TRPC_MODULE_CALLER_FILE_PATH;
       }
-      return this.normalizePath(jsFilePath);
+
+      // Fallback to stack trace method
+      const error = new Error();
+      const stack = error.stack || '';
+      const stackLines = stack.split('\n');
+
+      // Log the stack for debugging
+      console.log('[TRPC Debug] Stack trace for caller detection:');
+      stackLines.slice(1, 10).forEach((line, index) => {
+        console.log(`[TRPC Debug] Stack[${index}]: ${line}`);
+      });
+
+      // Try to find a path in the stack trace
+      for (const line of stackLines) {
+        const match = line.match(/\((.+?):[0-9]+:[0-9]+\)/);
+        if (match && match[1] && !match[1].includes('node_modules')) {
+          const filePath = match[1];
+          if (fs.existsSync(filePath)) {
+            console.log(`[TRPC Debug] Found caller file path: ${filePath}`);
+            return filePath;
+          }
+        }
+      }
+
+      // Fallback to app module in current directory
+      const appModulePath = path.resolve(process.cwd(), 'src', 'app.module.ts');
+      console.log(
+        `[TRPC Debug] Falling back to app module path: ${appModulePath}`,
+      );
+
+      if (fs.existsSync(appModulePath)) {
+        return appModulePath;
+      }
+
+      // Last resort - return a fixed path but show warning
+      console.warn(
+        '[TRPC Debug] Could not determine caller file path, using fallback',
+      );
+      return './src/app.module.ts';
+    } catch (error) {
+      console.error(
+        `[TRPC Debug] Error getting caller file path: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      console.error(error instanceof Error ? error.stack : undefined);
+      return './src/app.module.ts';
     }
   }
 

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import {
   ConsoleLogger,
   Inject,
@@ -68,7 +69,33 @@ export class TRPCGenerator implements OnModuleInit {
   private readonly importsScanner!: ImportsScanner;
 
   onModuleInit() {
-    this.rootModuleImportsMap = this.buildRootImportsMap();
+    try {
+      this.consoleLogger.log(
+        `[TRPC Debug] Module caller file path: ${this.moduleCallerFilePath}`,
+        'TRPC Generator',
+      );
+
+      if (!this.moduleCallerFilePath) {
+        this.consoleLogger.warn(
+          '[TRPC Debug] Module caller file path is not set. This will cause issues with imports.',
+          'TRPC Generator',
+        );
+      } else if (!fs.existsSync(this.moduleCallerFilePath)) {
+        this.consoleLogger.warn(
+          `[TRPC Debug] Module caller file does not exist at: ${this.moduleCallerFilePath}`,
+          'TRPC Generator',
+        );
+      }
+
+      this.rootModuleImportsMap = this.buildRootImportsMap();
+    } catch (error) {
+      this.consoleLogger.error(
+        `[TRPC Debug] Error in onModuleInit: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+        'TRPC Generator',
+      );
+      // Don't rethrow - we want to gracefully handle this
+    }
   }
 
   public async generateSchemaFile(
@@ -77,29 +104,29 @@ export class TRPCGenerator implements OnModuleInit {
     try {
       this.consoleLogger.log(
         '[TRPC Debug] Starting AppRouter schema generation...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       // Add file path debugging
       this.consoleLogger.log(
         `[TRPC Debug] AppRouter file path: ${this.appRouterSourceFile.getFilePath()}`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
       this.consoleLogger.log(
-        `[TRPC Debug] File exists: ${require('fs').existsSync(this.appRouterSourceFile.getFilePath())}`,
-        'TRPC Generator'
+        `[TRPC Debug] File exists: ${fs.existsSync(this.appRouterSourceFile.getFilePath())}`,
+        'TRPC Generator',
       );
       this.consoleLogger.log(
-        `[TRPC Debug] Directory exists: ${require('fs').existsSync(path.dirname(this.appRouterSourceFile.getFilePath()))}`,
-        'TRPC Generator'
+        `[TRPC Debug] Directory exists: ${fs.existsSync(path.dirname(this.appRouterSourceFile.getFilePath()))}`,
+        'TRPC Generator',
       );
-      
+
       const routers = this.routerFactory.getRouters();
       this.consoleLogger.log(
         `Found ${routers.length} router(s) for schema generation`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       const mappedRoutesAndProcedures = routers.map((route) => {
         const { instance, name, alias, path } = route;
         const prototype = Object.getPrototypeOf(instance);
@@ -107,10 +134,10 @@ export class TRPCGenerator implements OnModuleInit {
           instance,
           prototype,
         );
-        
+
         this.consoleLogger.log(
           `Processing router "${name}" with ${procedures.length} procedure(s)`,
-          'TRPC Generator'
+          'TRPC Generator',
         );
 
         return { name, path, alias, instance: { ...route }, procedures };
@@ -118,14 +145,14 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         'Generating static declarations...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
       this.staticGenerator.generateStaticDeclaration(this.appRouterSourceFile);
 
       if (schemaImports != null && schemaImports.length > 0) {
         this.consoleLogger.log(
           `Adding ${schemaImports.length} schema import(s)...`,
-          'TRPC Generator'
+          'TRPC Generator',
         );
         const schemaImportNames: Array<string> = schemaImports.map(
           (schemaImport) => (schemaImport as any).name,
@@ -139,7 +166,7 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         'Serializing router metadata...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
       const routersMetadata = this.serializerHandler.serializeRouters(
         mappedRoutesAndProcedures,
@@ -148,7 +175,7 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         'Generating router string declarations...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
       const routersStringDeclarations =
         this.serializerHandler.generateRoutersStringFromMetadata(
@@ -157,7 +184,7 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         'Adding router statements to source file...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
       this.appRouterSourceFile.addStatements(/* ts */ `
         const appRouter = t.router({${routersStringDeclarations}});
@@ -166,7 +193,7 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         `Saving AppRouter to "${this.appRouterSourceFile.getFilePath()}"...`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
       await saveOrOverrideFile(this.appRouterSourceFile);
 
@@ -178,7 +205,7 @@ export class TRPCGenerator implements OnModuleInit {
       this.consoleLogger.error(
         'TRPC Generator encountered an error while generating schema file.',
         error instanceof Error ? error.stack : String(error),
-        'TRPC Generator'
+        'TRPC Generator',
       );
     }
   }
@@ -189,25 +216,25 @@ export class TRPCGenerator implements OnModuleInit {
     try {
       this.consoleLogger.log(
         'Starting helper types generation...',
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       const middlewares = this.middlewareFactory.getMiddlewares();
       this.consoleLogger.log(
         `Found ${middlewares.length} middleware(s) for helper generation`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       const outputPath = path.resolve(
         this.HELPER_TYPES_OUTPUT_PATH,
-        this.HELPER_TYPES_OUTPUT_FILE
+        this.HELPER_TYPES_OUTPUT_FILE,
       );
-      
+
       this.consoleLogger.log(
         `Creating helper types source file at "${outputPath}"...`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       const helperTypesSourceFile = this.project.createSourceFile(
         outputPath,
         undefined,
@@ -217,9 +244,9 @@ export class TRPCGenerator implements OnModuleInit {
       if (context != null) {
         this.consoleLogger.log(
           `Processing context type "${context.name}"...`,
-          'TRPC Generator'
+          'TRPC Generator',
         );
-        
+
         const contextImport = this.rootModuleImportsMap.get(context.name);
 
         if (contextImport == null) {
@@ -233,9 +260,9 @@ export class TRPCGenerator implements OnModuleInit {
 
         this.consoleLogger.log(
           'Adding Context type alias to helper file...',
-          'TRPC Generator'
+          'TRPC Generator',
         );
-        
+
         helperTypesSourceFile.addTypeAlias({
           isExported: true,
           name: 'Context',
@@ -246,9 +273,9 @@ export class TRPCGenerator implements OnModuleInit {
       for (const middleware of middlewares) {
         this.consoleLogger.log(
           `Processing middleware "${middleware}"...`,
-          'TRPC Generator'
+          'TRPC Generator',
         );
-        
+
         const middlewareInterface =
           await this.middlewareHandler.getMiddlewareInterface(
             middleware.path,
@@ -259,9 +286,9 @@ export class TRPCGenerator implements OnModuleInit {
         if (middlewareInterface != null) {
           this.consoleLogger.log(
             `Adding middleware interface "${middlewareInterface.name}Context" to helper file...`,
-            'TRPC Generator'
+            'TRPC Generator',
           );
-          
+
           helperTypesSourceFile.addInterface({
             isExported: true,
             name: `${middlewareInterface.name}Context`,
@@ -273,9 +300,9 @@ export class TRPCGenerator implements OnModuleInit {
 
       this.consoleLogger.log(
         `Saving helper types to "${outputPath}"...`,
-        'TRPC Generator'
+        'TRPC Generator',
       );
-      
+
       await saveOrOverrideFile(helperTypesSourceFile);
 
       this.consoleLogger.log(
@@ -286,23 +313,58 @@ export class TRPCGenerator implements OnModuleInit {
       this.consoleLogger.error(
         'TRPC Generator encountered an error while generating helper file.',
         e instanceof Error ? e.stack : String(e),
-        'TRPC Generator'
+        'TRPC Generator',
       );
     }
   }
 
   private buildRootImportsMap(): Map<string, SourceFileImportsMap> {
-    const rootModuleSourceFile = this.project.addSourceFileAtPathIfExists(
-      this.moduleCallerFilePath,
-    );
+    try {
+      this.consoleLogger.log(
+        `[TRPC Debug] Building root imports map using file: ${this.moduleCallerFilePath}`,
+        'TRPC Generator',
+      );
 
-    if (rootModuleSourceFile == null) {
-      throw new Error('Could not access root module file.');
+      // Check if file exists before trying to add it
+      if (!fs.existsSync(this.moduleCallerFilePath)) {
+        this.consoleLogger.warn(
+          `[TRPC Debug] Root module file does not exist at: ${this.moduleCallerFilePath}`,
+          'TRPC Generator',
+        );
+        // Return empty map instead of throwing - this allows the app to continue
+        return new Map<string, SourceFileImportsMap>();
+      }
+
+      const rootModuleSourceFile = this.project.addSourceFileAtPathIfExists(
+        this.moduleCallerFilePath,
+      );
+
+      if (rootModuleSourceFile == null) {
+        this.consoleLogger.error(
+          `[TRPC Debug] Failed to load root module file: ${this.moduleCallerFilePath}`,
+          'TRPC Generator',
+        );
+        // Return empty map instead of throwing
+        return new Map<string, SourceFileImportsMap>();
+      }
+
+      this.consoleLogger.log(
+        `[TRPC Debug] Successfully loaded root module file`,
+        'TRPC Generator',
+      );
+
+      return this.importsScanner.buildSourceFileImportsMap(
+        rootModuleSourceFile,
+        this.project,
+      );
+    } catch (error) {
+      this.consoleLogger.error(
+        `[TRPC Debug] Error building root imports map: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+        'TRPC Generator',
+      );
+      // Return empty map instead of throwing
+      return new Map<string, SourceFileImportsMap>();
     }
-
-    return this.importsScanner.buildSourceFileImportsMap(
-      rootModuleSourceFile,
-      this.project,
-    );
   }
 }
