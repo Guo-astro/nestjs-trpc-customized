@@ -158,7 +158,14 @@ export const publicProcedure = t.procedure;
     this.consoleLogger.log('Getting TRPC module options', 'StaticGenerator');
     try {
       // Log all environment variables to debug
-      this.consoleLogger.log(`All env vars: ${JSON.stringify(process.env)}`, 'StaticGenerator');
+      this.consoleLogger.log('--- Environment Variables Debug ---', 'StaticGenerator');
+      const relevantEnvVars = {
+        TRPC_SCHEMA_FILE_PATH: process.env.TRPC_SCHEMA_FILE_PATH,
+        TRPC_AUTO_SCHEMA_PATH: process.env.TRPC_AUTO_SCHEMA_PATH,
+        NODE_ENV: process.env.NODE_ENV,
+        PWD: process.env.PWD
+      };
+      this.consoleLogger.log(`Relevant env vars: ${JSON.stringify(relevantEnvVars, null, 2)}`, 'StaticGenerator');
       
       // Try to get options from multiple possible sources
       const schemaPath = process.env.TRPC_SCHEMA_FILE_PATH || 
@@ -166,16 +173,38 @@ export const publicProcedure = t.procedure;
                          './src/trpc/generated';
       
       this.consoleLogger.log(`Using schema path: ${schemaPath}`, 'StaticGenerator');
+      this.consoleLogger.log(`Current working directory: ${process.cwd()}`, 'StaticGenerator');
       
-      return { 
+      // Check if path exists and is writable
+      try {
+        const isAbsolute = path.isAbsolute(schemaPath);
+        const resolvedPath = isAbsolute ? schemaPath : path.resolve(process.cwd(), schemaPath);
+        this.consoleLogger.log(`Schema path is ${isAbsolute ? 'absolute' : 'relative'}`, 'StaticGenerator');
+        this.consoleLogger.log(`Resolved schema path: ${resolvedPath}`, 'StaticGenerator');
+        
+        // Check if directory exists
+        fs.access(path.dirname(resolvedPath))
+          .then(() => this.consoleLogger.log(`Directory ${path.dirname(resolvedPath)} exists and is accessible`, 'StaticGenerator'))
+          .catch(err => this.consoleLogger.warn(`Directory ${path.dirname(resolvedPath)} is not accessible: ${err.message}`, 'StaticGenerator'));
+      } catch (err) {
+        this.consoleLogger.warn(`Error checking schema path: ${err}`, 'StaticGenerator');
+      }
+      
+      const options = { 
         autoSchemaFile: schemaPath,
         schemaFileImports: [] // Add default empty array
       };
+      
+      this.consoleLogger.log(`Final TRPC options: ${JSON.stringify(options, null, 2)}`, 'StaticGenerator');
+      return options;
     } catch (error) {
       this.consoleLogger.error(
         `Failed to get TRPC options: ${error}`,
         'StaticGenerator',
       );
+      if (error instanceof Error) {
+        this.consoleLogger.error(`Stack trace: ${error.stack}`, 'StaticGenerator');
+      }
       return null;
     }
   }
@@ -185,7 +214,13 @@ export const publicProcedure = t.procedure;
       `Resolving target directory for: ${autoSchemaFile}`,
       'Static Generator',
     );
-    if (path.isAbsolute(autoSchemaFile)) {
+    const isAbsolute = path.isAbsolute(autoSchemaFile);
+    this.consoleLogger.log(
+      `Path is ${isAbsolute ? 'absolute' : 'relative'}`,
+      'Static Generator',
+    );
+    
+    if (isAbsolute) {
       this.consoleLogger.log(
         `Using absolute path: ${autoSchemaFile}`,
         'Static Generator',
@@ -194,9 +229,14 @@ export const publicProcedure = t.procedure;
     }
 
     const cwd = process.cwd();
+    this.consoleLogger.log(
+      `Current working directory: ${cwd}`,
+      'Static Generator',
+    );
+    
     const resolved = path.resolve(cwd, autoSchemaFile);
     this.consoleLogger.log(
-      `Resolved relative path ${autoSchemaFile} to absolute path: ${resolved}`,
+      `Resolved relative path "${autoSchemaFile}" to absolute path: "${resolved}"`,
       'Static Generator',
     );
     return resolved;
@@ -208,7 +248,43 @@ export const publicProcedure = t.procedure;
         `Ensuring directory exists: ${dirPath}`,
         'Static Generator',
       );
-      await fs.mkdir(dirPath, { recursive: true });
+      
+      try {
+        const stats = await fs.stat(dirPath).catch(() => null);
+        if (stats) {
+          this.consoleLogger.log(
+            `Directory already exists: ${dirPath}, isDirectory: ${stats.isDirectory()}`,
+            'Static Generator',
+          );
+          if (!stats.isDirectory()) {
+            throw new Error(`Path exists but is not a directory: ${dirPath}`);
+          }
+        } else {
+          this.consoleLogger.log(
+            `Directory does not exist, creating: ${dirPath}`,
+            'Static Generator',
+          );
+          await fs.mkdir(dirPath, { recursive: true });
+        }
+      } catch (statError) {
+        this.consoleLogger.log(
+          `Error checking directory, attempting to create: ${statError}`,
+          'Static Generator',
+        );
+        await fs.mkdir(dirPath, { recursive: true });
+      }
+      
+      // Verify directory was created successfully
+      const accessCheck = await fs.access(dirPath).then(() => true).catch(() => false);
+      this.consoleLogger.log(
+        `Directory access check: ${accessCheck ? 'Success' : 'Failed'}`,
+        'Static Generator',
+      );
+      
+      if (!accessCheck) {
+        throw new Error(`Directory created but not accessible: ${dirPath}`);
+      }
+      
       this.consoleLogger.log(
         `Directory created/verified: ${dirPath}`,
         'Static Generator',
@@ -224,24 +300,34 @@ export const publicProcedure = t.procedure;
 
   private generateServerContent(options: any): string {
     this.consoleLogger.log('Generating server.ts content', 'Static Generator');
+    this.consoleLogger.log(`Options: ${JSON.stringify(options, null, 2)}`, 'Static Generator');
 
     // Build imports from schema registry if available
     let importStatements = '';
     if (options.schemaFileImports && options.schemaFileImports.length > 0) {
       this.consoleLogger.log(
-        `Adding ${options.schemaFileImports.length} schema imports`,
+        `Adding ${options.schemaFileImports.length} schema imports:`,
         'Static Generator',
       );
+      this.consoleLogger.log(
+        JSON.stringify(options.schemaFileImports, null, 2),
+        'Static Generator',
+      );
+      
       importStatements = options.schemaFileImports
         .map(
-          (importItem: any) =>
-            `import { ${importItem.name} } from '${importItem.path || '../schemas'}';`,
+          (importItem: any) => {
+            const importStmt = `import { ${importItem.name} } from '${importItem.path || '../schemas'}';`;
+            this.consoleLogger.log(`Generated import: ${importStmt}`, 'Static Generator');
+            return importStmt;
+          }
         )
         .join('\n');
+    } else {
+      this.consoleLogger.log('No schema imports to add', 'Static Generator');
     }
 
-    // Basic server.ts template with corrected tRPC initialization
-    return `// This file is auto-generated by nestjs-trpc. Do not edit manually.
+    const serverContent = `// This file is auto-generated by nestjs-trpc. Do not edit manually.
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
 ${importStatements}
@@ -253,6 +339,18 @@ export const t = initTRPC.create();
 export const router = t.router;
 export const publicProcedure = t.procedure;
 `;
+
+    this.consoleLogger.log(
+      `Generated server content length: ${serverContent.length} bytes`,
+      'Static Generator',
+    );
+    // Log first 100 chars of the content for debugging
+    this.consoleLogger.log(
+      `Content preview: ${serverContent.substring(0, 100)}...`,
+      'Static Generator',
+    );
+    
+    return serverContent;
   }
 
   public generateStaticDeclaration(sourceFile: SourceFile): void {
