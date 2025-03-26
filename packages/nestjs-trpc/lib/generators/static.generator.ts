@@ -110,71 +110,36 @@ export class StaticGenerator {
         'StaticGenerator',
       );
 
-      // If using a package name, force all schemas to be imported from there
+      // Direct package import handling - this should have priority
       if (schemaPackageName && schemaImportNames.length > 0) {
         this.consoleLogger.log(
-          `[TRPC Debug] Using schema package name: ${schemaPackageName} for ${schemaImportNames.length} schemas`,
+          `[TRPC Debug] Will import ${schemaImportNames.length} schemas directly from package: ${schemaPackageName}`,
           'StaticGenerator',
         );
 
-        // Clear any existing imports with the same package
-        let removedImports = 0;
-        for (const imp of existingImports) {
-          if (imp.getModuleSpecifierValue() === schemaPackageName) {
-            this.consoleLogger.log(
-              `[TRPC Debug] Removing existing import from ${schemaPackageName}`,
-              'StaticGenerator',
-            );
-            imp.remove();
-            removedImports++;
-          }
-        }
-        this.consoleLogger.log(
-          `[TRPC Debug] Removed ${removedImports} existing imports`,
-          'StaticGenerator',
-        );
-
-        // Create a single import with all schema names from the package
-        this.consoleLogger.log(
-          `[TRPC Debug] Creating new import declaration with ${schemaImportNames.length} names from ${schemaPackageName}`,
-          'StaticGenerator',
-        );
-
-        // Create and add the import declaration
+        // Create package import (don't attempt to remove existing imports as they may not exist yet)
         sourceFile.addImportDeclaration({
           moduleSpecifier: schemaPackageName,
           namedImports: schemaImportNames,
         });
 
-        // Verify it was added
+        // Verify import was added
         const updatedImports = sourceFile.getImportDeclarations();
-        let found = false;
         for (const imp of updatedImports) {
           if (imp.getModuleSpecifierValue() === schemaPackageName) {
             const names = imp.getNamedImports().map((n) => n.getName());
             this.consoleLogger.log(
-              `[TRPC Debug] Verified import: found ${names.length} names from ${schemaPackageName}`,
+              `[TRPC Debug] Successfully added import from ${schemaPackageName} with ${names.length} schemas`,
               'StaticGenerator',
             );
-            found = true;
           }
         }
 
-        if (!found) {
-          this.consoleLogger.error(
-            `[TRPC Debug] Failed to add import from ${schemaPackageName}`,
-            'StaticGenerator',
-          );
-        }
-
-        this.consoleLogger.log(
-          `[TRPC Debug] Package import process completed`,
-          'StaticGenerator',
-        );
+        // If using package import, skip the regular import logic
         return;
       }
 
-      // Original behavior for local file imports
+      // Original behavior for local file imports (this is what's failing)
       const importDeclarations: ImportDeclarationStructure[] = [];
 
       for (const schemaImportName of schemaImportNames) {
@@ -232,7 +197,9 @@ export class StaticGenerator {
         'StaticGenerator',
       );
 
-      sourceFile.addImportDeclarations(importDeclarations);
+      if (importDeclarations.length > 0) {
+        sourceFile.addImportDeclarations(importDeclarations);
+      }
 
       this.consoleLogger.log(
         `[TRPC Debug] Schema imports added successfully`,

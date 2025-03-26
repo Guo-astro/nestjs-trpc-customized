@@ -94,6 +94,19 @@ export class TRPCModule implements OnModuleInit {
         );
       }
 
+      // Log schema package name if provided
+      if (options.schemaPackageName) {
+        console.log(
+          `[TRPC Debug] Will use schema package name: ${options.schemaPackageName}`,
+        );
+
+        if (options.schemaFileImports && options.schemaFileImports.length > 0) {
+          console.log(
+            `[TRPC Debug] Will import ${options.schemaFileImports.length} schemas from package`,
+          );
+        }
+      }
+
       imports.push(
         GeneratorModule.forRoot({
           outputDirPath: options.autoSchemaFile,
