@@ -130,6 +130,7 @@ export class ProcedureGenerator {
           this.appRouterSourceFile,
           [expression.getText()],
           importsMap,
+          undefined, // Add the fourth parameter (schemaPackageName)
         );
       }
 

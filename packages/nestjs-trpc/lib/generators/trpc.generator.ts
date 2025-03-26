@@ -155,14 +155,14 @@ export class TRPCGenerator implements OnModuleInit {
           `Adding ${schemaImports.length} schema import(s)...`,
           'TRPC Generator',
         );
-        
+
         if (schemaPackageName) {
           this.consoleLogger.log(
             `Using schema package name: ${schemaPackageName}`,
             'TRPC Generator',
           );
         }
-        
+
         const schemaImportNames: Array<string> = schemaImports.map(
           (schemaImport) => (schemaImport as any).name,
         );

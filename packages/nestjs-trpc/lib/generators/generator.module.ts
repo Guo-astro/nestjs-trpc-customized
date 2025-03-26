@@ -90,7 +90,7 @@ export class GeneratorModule implements OnModuleInit {
     console.log('[TRPC Debug] GeneratorModule.onModuleInit called');
     await this.trpcGenerator.generateSchemaFile(
       this.options.schemaFileImports,
-      this.options.schemaPackageName
+      this.options.schemaPackageName,
     );
     await this.trpcGenerator.generateHelpersFile(this.options.context);
   }
