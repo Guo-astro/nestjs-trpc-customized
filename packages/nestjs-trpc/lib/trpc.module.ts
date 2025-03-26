@@ -87,6 +87,13 @@ export class TRPCModule implements OnModuleInit {
       // Store the caller file path in an env var for access in containers
       process.env.TRPC_MODULE_CALLER_FILE_PATH = callerFilePath;
 
+      // Log schema package name if provided
+      if (options.schemaPackageName) {
+        console.log(
+          `[TRPC Debug] Using schema package name: ${options.schemaPackageName}`,
+        );
+      }
+
       imports.push(
         GeneratorModule.forRoot({
           outputDirPath: options.autoSchemaFile,

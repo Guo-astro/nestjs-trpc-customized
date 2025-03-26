@@ -1,6 +1,6 @@
 {
   "name": "nestjs-trpc-customized",
-  "version": "1.6.16",
+  "version": "1.6.17",
   "homepage": "https://nestjs-trpc.io",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

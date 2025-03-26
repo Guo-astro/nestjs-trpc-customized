@@ -91,79 +91,88 @@ export class StaticGenerator {
         'StaticGenerator',
       );
 
-      const importDeclarations: ImportDeclarationStructure[] = [];
-
-      // If a schema package name is provided, import all schemas from it
-      if (schemaPackageName) {
+      // If using a package name, force all schemas to be imported from there
+      if (schemaPackageName && schemaImportNames.length > 0) {
         this.consoleLogger.log(
-          `[TRPC Debug] Using schema package name: ${schemaPackageName}`,
+          `[TRPC Debug] Using schema package name: ${schemaPackageName} for ${schemaImportNames.length} schemas`,
           'StaticGenerator',
         );
 
-        // Create a single import declaration from the package
-        importDeclarations.push({
-          kind: StructureKind.ImportDeclaration,
+        // Clear any existing imports to ensure we create a fresh import
+        const existingImports = sourceFile.getImportDeclarations();
+        for (const imp of existingImports) {
+          if (imp.getModuleSpecifierValue() === schemaPackageName) {
+            this.consoleLogger.log(
+              `[TRPC Debug] Removing existing import from ${schemaPackageName}`,
+              'StaticGenerator',
+            );
+            imp.remove();
+          }
+        }
+
+        // Create a single import with all schema names from the package
+        sourceFile.addImportDeclaration({
           moduleSpecifier: schemaPackageName,
           namedImports: schemaImportNames,
         });
 
         this.consoleLogger.log(
-          `[TRPC Debug] Created import declaration for ${schemaImportNames.length} schemas from ${schemaPackageName}`,
+          `[TRPC Debug] Added import from ${schemaPackageName} with schemas: ${schemaImportNames.join(', ')}`,
           'StaticGenerator',
         );
-      } else {
-        // Original behavior: find imports from local files
-        for (const schemaImportName of schemaImportNames) {
+        return;
+      }
+
+      // Original behavior for local file imports
+      const importDeclarations: ImportDeclarationStructure[] = [];
+
+      for (const schemaImportName of schemaImportNames) {
+        this.consoleLogger.log(
+          `[TRPC Debug] Processing schema import: ${schemaImportName}`,
+          'StaticGenerator',
+        );
+
+        for (const [importMapKey, importMapMetadata] of importsMap.entries()) {
+          if (schemaImportName == null || importMapKey !== schemaImportName) {
+            continue;
+          }
+
+          const sourceFilePath = importMapMetadata.sourceFile.getFilePath();
+          const targetDir = path.dirname(sourceFile.getFilePath());
+
           this.consoleLogger.log(
-            `[TRPC Debug] Processing schema import: ${schemaImportName}`,
+            `[TRPC Debug] Import source file: ${sourceFilePath}`,
+            'StaticGenerator',
+          );
+          this.consoleLogger.log(
+            `[TRPC Debug] Target directory: ${targetDir}`,
             'StaticGenerator',
           );
 
-          for (const [
-            importMapKey,
-            importMapMetadata,
-          ] of importsMap.entries()) {
-            if (schemaImportName == null || importMapKey !== schemaImportName) {
-              continue;
-            }
+          const relativePath = path.relative(
+            targetDir,
+            sourceFilePath.replace(/\.ts$/, ''),
+          );
 
-            const sourceFilePath = importMapMetadata.sourceFile.getFilePath();
-            const targetDir = path.dirname(sourceFile.getFilePath());
+          this.consoleLogger.log(
+            `[TRPC Debug] Calculated relative path: ${relativePath}`,
+            'StaticGenerator',
+          );
 
-            this.consoleLogger.log(
-              `[TRPC Debug] Import source file: ${sourceFilePath}`,
-              'StaticGenerator',
-            );
-            this.consoleLogger.log(
-              `[TRPC Debug] Target directory: ${targetDir}`,
-              'StaticGenerator',
-            );
+          const moduleSpecifier = relativePath.startsWith('.')
+            ? relativePath
+            : `./${relativePath}`;
 
-            const relativePath = path.relative(
-              targetDir,
-              sourceFilePath.replace(/\.ts$/, ''),
-            );
+          this.consoleLogger.log(
+            `[TRPC Debug] Final module specifier: ${moduleSpecifier}`,
+            'StaticGenerator',
+          );
 
-            this.consoleLogger.log(
-              `[TRPC Debug] Calculated relative path: ${relativePath}`,
-              'StaticGenerator',
-            );
-
-            const moduleSpecifier = relativePath.startsWith('.')
-              ? relativePath
-              : `./${relativePath}`;
-
-            this.consoleLogger.log(
-              `[TRPC Debug] Final module specifier: ${moduleSpecifier}`,
-              'StaticGenerator',
-            );
-
-            importDeclarations.push({
-              kind: StructureKind.ImportDeclaration,
-              moduleSpecifier: moduleSpecifier,
-              namedImports: [schemaImportName],
-            });
-          }
+          importDeclarations.push({
+            kind: StructureKind.ImportDeclaration,
+            moduleSpecifier: moduleSpecifier,
+            namedImports: [schemaImportName],
+          });
         }
       }
 

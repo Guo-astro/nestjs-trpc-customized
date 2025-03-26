@@ -8,6 +8,10 @@ export async function saveOrOverrideFile(
   try {
     console.log(`[TRPC Debug] Saving file: ${sourceFile.getFilePath()}`);
 
+    // Log the content of the file for debugging
+    console.log('[TRPC Debug] File content:');
+    console.log(sourceFile.getFullText().substring(0, 500)); // First 500 chars
+
     // Ensure directory exists
     const dirPath = path.dirname(sourceFile.getFilePath());
     if (!fs.existsSync(dirPath)) {
@@ -15,7 +19,12 @@ export async function saveOrOverrideFile(
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    sourceFile.formatText({ indentSize: 2 });
+    // Format the file before saving
+    sourceFile.formatText({
+      indentSize: 2,
+      ensureNewLineAtEndOfFile: true,
+    });
+
     await sourceFile.save();
 
     console.log(
