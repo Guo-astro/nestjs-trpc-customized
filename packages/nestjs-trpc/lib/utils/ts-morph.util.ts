@@ -8,9 +8,20 @@ export async function saveOrOverrideFile(
   try {
     console.log(`[TRPC Debug] Saving file: ${sourceFile.getFilePath()}`);
 
-    // Log the content of the file for debugging
-    console.log('[TRPC Debug] File content:');
-    console.log(sourceFile.getFullText().substring(0, 500)); // First 500 chars
+    // Check the structure of the file
+    const imports = sourceFile.getImportDeclarations();
+    console.log(
+      `[TRPC Debug] File has ${imports.length} imports before saving`,
+    );
+
+    for (const imp of imports) {
+      console.log(
+        `[TRPC Debug] Import: ${imp.getModuleSpecifierValue()} - ${imp
+          .getNamedImports()
+          .map((n) => n.getName())
+          .join(', ')}`,
+      );
+    }
 
     // Ensure directory exists
     const dirPath = path.dirname(sourceFile.getFilePath());
@@ -19,17 +30,34 @@ export async function saveOrOverrideFile(
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    // Format the file before saving
+    // Format with specific options
     sourceFile.formatText({
       indentSize: 2,
       ensureNewLineAtEndOfFile: true,
+      insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces: true,
     });
 
+    // Save the file
     await sourceFile.save();
 
-    console.log(
-      `[TRPC Debug] File saved successfully: ${sourceFile.getFilePath()}`,
-    );
+    // Verify file was saved correctly
+    console.log(`[TRPC Debug] File saved: success`);
+
+    // Verify the file exists
+    if (fs.existsSync(sourceFile.getFilePath())) {
+      console.log(
+        `[TRPC Debug] Verified file exists at: ${sourceFile.getFilePath()}`,
+      );
+
+      // Read the saved file to verify content
+      const content = fs.readFileSync(sourceFile.getFilePath(), 'utf8');
+      console.log(`[TRPC Debug] Saved file size: ${content.length} bytes`);
+      console.log(`[TRPC Debug] First 200 chars: ${content.substring(0, 200)}`);
+    } else {
+      console.error(
+        `[TRPC Debug] File does not exist after save: ${sourceFile.getFilePath()}`,
+      );
+    }
   } catch (error) {
     console.error(
       `[TRPC Debug] Error saving file: ${sourceFile.getFilePath()}`,

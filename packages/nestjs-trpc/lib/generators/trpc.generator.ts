@@ -108,6 +108,19 @@ export class TRPCGenerator implements OnModuleInit {
         'TRPC Generator',
       );
 
+      // Add package name debugging
+      if (schemaPackageName) {
+        this.consoleLogger.log(
+          `[TRPC Debug] Using schema package name: ${schemaPackageName}`,
+          'TRPC Generator',
+        );
+      } else {
+        this.consoleLogger.log(
+          '[TRPC Debug] No schema package name provided, will use relative imports',
+          'TRPC Generator',
+        );
+      }
+
       // Add file path debugging
       this.consoleLogger.log(
         `[TRPC Debug] AppRouter file path: ${this.appRouterSourceFile.getFilePath()}`,
@@ -152,26 +165,49 @@ export class TRPCGenerator implements OnModuleInit {
 
       if (schemaImports != null && schemaImports.length > 0) {
         this.consoleLogger.log(
-          `Adding ${schemaImports.length} schema import(s)...`,
+          `[TRPC Debug] Adding ${schemaImports.length} schema import(s)...`,
           'TRPC Generator',
         );
 
-        if (schemaPackageName) {
-          this.consoleLogger.log(
-            `Using schema package name: ${schemaPackageName}`,
-            'TRPC Generator',
-          );
-        }
-
+        // Debug the schema import names
         const schemaImportNames: Array<string> = schemaImports.map(
           (schemaImport) => (schemaImport as any).name,
         );
+
+        this.consoleLogger.log(
+          `[TRPC Debug] Schema import names: ${schemaImportNames.join(', ')}`,
+          'TRPC Generator',
+        );
+
+        // Force a direct call to addSchemaImports
+        this.consoleLogger.log(
+          `[TRPC Debug] Calling addSchemaImports with package name: ${schemaPackageName || 'none'}`,
+          'TRPC Generator',
+        );
+
         this.staticGenerator.addSchemaImports(
           this.appRouterSourceFile,
           schemaImportNames,
           this.rootModuleImportsMap,
           schemaPackageName,
         );
+
+        // Debug the imports after adding
+        const sourceImports = this.appRouterSourceFile.getImportDeclarations();
+        this.consoleLogger.log(
+          `[TRPC Debug] File now has ${sourceImports.length} import declarations`,
+          'TRPC Generator',
+        );
+
+        for (const imp of sourceImports) {
+          this.consoleLogger.log(
+            `[TRPC Debug] Import: ${imp.getModuleSpecifierValue()} - ${imp
+              .getNamedImports()
+              .map((n) => n.getName())
+              .join(', ')}`,
+            'TRPC Generator',
+          );
+        }
       }
 
       this.consoleLogger.log(
@@ -205,6 +241,22 @@ export class TRPCGenerator implements OnModuleInit {
         `Saving AppRouter to "${this.appRouterSourceFile.getFilePath()}"...`,
         'TRPC Generator',
       );
+
+      // Before saving, check if the schema imports are in the file
+      this.consoleLogger.log(
+        `[TRPC Debug] Final check before saving. File has ${this.appRouterSourceFile.getImportDeclarations().length} imports`,
+        'TRPC Generator',
+      );
+
+      this.consoleLogger.log(
+        `[TRPC Debug] Full file content before saving (first 1000 chars):`,
+        'TRPC Generator',
+      );
+      this.consoleLogger.log(
+        this.appRouterSourceFile.getFullText().substring(0, 1000),
+        'TRPC Generator',
+      );
+
       await saveOrOverrideFile(this.appRouterSourceFile);
 
       this.consoleLogger.log(
