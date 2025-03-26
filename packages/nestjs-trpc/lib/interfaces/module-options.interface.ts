@@ -29,6 +29,13 @@ export interface TRPCModuleOptions {
   schemaFileImports?: Array<SchemaImports>;
 
   /**
+   * Specifies a package name to import schemas from instead of using relative paths.
+   * When provided, all schemas in schemaFileImports will be imported from this package.
+   * Example: '@open-fleet-engine/all-schemas'
+   */
+  schemaPackageName?: string;
+
+  /**
    * The base path for all trpc requests.
    * @default "/trpc"
    */
